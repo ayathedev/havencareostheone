@@ -1,0 +1,10 @@
+{
+  "name": "Haven Care OS",
+  "description": "A trauma-informed administrative operating system for nonprofit management, featuring a ChromeOS-inspired desktop interface.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

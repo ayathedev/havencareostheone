@@ -1,0 +1,334 @@
+{
+  "entities": {
+    "Client": {
+      "title": "Client",
+      "description": "Individual receiving services from the nonprofit.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "high-priority", "crisis", "closed"] },
+        "summary": { "type": "string" },
+        "dob": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "pronouns": { "type": "string" },
+        "emergencyContact": { "type": "string" },
+        "hipaaConsent": { "type": "boolean" },
+        "hipaaConsentDate": { "type": "string", "format": "date-time" },
+        "liabilityWaiver": { "type": "boolean" },
+        "liabilityWaiverDate": { "type": "string", "format": "date-time" },
+        "intakeNotes": { "type": "string" },
+        "sdoh": {
+          "type": "object",
+          "properties": {
+            "housing": { "type": "string", "enum": ["Stable", "Unstable", "Homeless"] },
+            "food": { "type": "string", "enum": ["Secure", "Insecure"] },
+            "transport": { "type": "string", "enum": ["Access", "No Access"] },
+            "safety": { "type": "string", "enum": ["Safe", "At Risk"] },
+            "health": { "type": "string", "enum": ["Insured", "Uninsured"] }
+          }
+        },
+        "goals": { "type": "array", "items": { "type": "string" } },
+        "safetyPlan": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "status"]
+    },
+    "Assessment": {
+      "title": "Needs Assessment",
+      "description": "AI-generated evaluation of client needs and SDoH.",
+      "type": "object",
+      "properties": {
+        "report": { "type": "string" },
+        "status": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "A scheduled interaction with a client.",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["Intake", "Follow-up", "Crisis", "Sync"] },
+        "notes": { "type": "string" },
+        "status": { "type": "string", "enum": ["Scheduled", "Completed", "Cancelled", "No-show"] },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Operational task or priority item.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "time": { "type": "string" },
+        "status": { "type": "string", "enum": ["Low", "Med", "High"] },
+        "completed": { "type": "boolean" },
+        "hubId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "status"]
+    },
+    "Grant": {
+      "title": "Grant",
+      "description": "Funding opportunity or active grant.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "amount": { "type": "number" },
+        "deadline": { "type": "string", "format": "date-time" },
+        "status": { "type": "string" },
+        "progress": { "type": "number" },
+        "deliverables": { "type": "array", "items": { "type": "string" } },
+        "purpose": { "type": "string" },
+        "associatedProject": { "type": "string" },
+        "reportingRequirements": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["name", "status"]
+    },
+    "TriageItem": {
+      "title": "Triage Item",
+      "description": "Unprocessed thoughts from Brain Dump.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "content": { "type": "string" },
+        "triageResult": { "type": "string" },
+        "processed": { "type": "boolean" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["content"]
+    },
+    "Program": {
+      "title": "Program",
+      "description": "Organizational service or protocol.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "desc": { "type": "string" },
+        "status": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Partner": {
+      "title": "Partner",
+      "description": "External organization or collaborator (Resource Hub).",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "organizationName": { "type": "string" },
+        "programName": { "type": "string" },
+        "website": { "type": "string" },
+        "contactName": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "address": { "type": "string" },
+        "eligibility": { "type": "string" },
+        "type": { "type": "string" },
+        "category": { "type": "string", "enum": ["Housing", "Food", "Medical", "Legal", "Transport", "Other"] },
+        "sync": { "type": "string" },
+        "notes": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Strategy": {
+      "title": "Strategy",
+      "description": "Strategic objective or mission component.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "desc": { "type": "string" },
+        "category": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Meeting": {
+        "title": "Meeting",
+        "description": "Interaction or sync event.",
+        "type": "object",
+        "properties": {
+            "title": { "type": "string" },
+            "date": { "type": "string" },
+            "description": { "type": "string" },
+            "attendees": { "type": "number" },
+            "ownerId": { "type": "string" },
+            "createdAt": { "type": "string", "format": "date-time" }
+        }
+    },
+    "ArchiveItem": {
+        "title": "Archive Item",
+        "description": "Historical record.",
+        "type": "object",
+        "properties": {
+            "title": { "type": "string" },
+            "content": { "type": "string" },
+            "type": { "type": "string" },
+            "date": { "type": "string" },
+            "ownerId": { "type": "string" },
+            "createdAt": { "type": "string", "format": "date-time" }
+        }
+    },
+    "ClientDocument": {
+      "title": "Client Document",
+      "description": "Metadata for an uploaded document related to a client.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "size": { "type": "string" },
+        "uploadedAt": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["name", "type", "ownerId"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System alert or user reminder.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["alert", "update", "reminder"] },
+        "date": { "type": "string", "format": "date-time" },
+        "read": { "type": "boolean" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["title", "message", "type", "ownerId"]
+    },
+    "Donation": {
+      "title": "Donation",
+      "description": "Financial contribution from a donor.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "donorName": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "type": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["donorName", "amount", "date", "ownerId"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Operational cost or spending.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "category": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["description", "amount", "date", "ownerId"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Configuration and setup state for the user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "language": { "type": "string" },
+        "organizationName": { "type": "string" },
+        "organizationAddress": { "type": "string" },
+        "organizationPhone": { "type": "string" },
+        "organizationWebsite": { "type": "string" },
+        "region": { "type": "string" },
+        "completedSetup": { "type": "boolean" },
+        "hubsPriority": { "type": "array", "items": { "type": "string" } },
+        "offlineEnabled": { "type": "boolean" },
+        "hasSeenTour": { "type": "boolean" },
+        "uiScale": { "type": "number", "default": 1 }
+      }
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Main user profile and setup state."
+    },
+    "users/{userId}/clients/{clientId}": {
+      "schema": "Client",
+      "description": "Client records owned by a specific user."
+    },
+    "users/{userId}/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Operational tasks."
+    },
+    "users/{userId}/grants/{grantId}": {
+      "schema": "Grant",
+      "description": "Grant tracking."
+    },
+    "users/{userId}/donations/{donationId}": {
+      "schema": "Donation",
+      "description": "Donation tracking."
+    },
+    "users/{userId}/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Expense tracking."
+    },
+    "users/{userId}/triage/{triageId}": {
+      "schema": "TriageItem",
+      "description": "Items waiting for triage."
+    },
+    "users/{userId}/programs/{programId}": {
+      "schema": "Program",
+      "description": "Service protocols."
+    },
+    "users/{userId}/partnerships/{partnerId}": {
+      "schema": "Partner",
+      "description": "Organizational partners."
+    },
+    "users/{userId}/strategies/{strategyId}": {
+      "schema": "Strategy",
+      "description": "Strategic vision objectives."
+    },
+    "users/{userId}/meetings/{meetingId}": {
+      "schema": "Meeting",
+      "description": "Interaction logs."
+    },
+    "users/{userId}/archive/{archiveId}": {
+      "schema": "ArchiveItem",
+      "description": "Legacy records."
+    },
+    "users/{userId}/notifications/{notifId}": {
+      "schema": "Notification",
+      "description": "System and user notifications."
+    },
+    "users/{userId}/clients/{clientId}/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Scheduled interactions for a client."
+    },
+    "users/{userId}/clients/{clientId}/assessments/{assessmentId}": {
+      "schema": "Assessment",
+      "description": "Needs assessments and referrals."
+    },
+    "users/{userId}/clients/{clientId}/documents/{docId}": {
+      "schema": "ClientDocument",
+      "description": "Uploaded metadata for client documents."
+    }
+  }
+}

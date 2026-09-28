@@ -1,0 +1,291 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- User Profiles & Data ---
+    match /users/{userId} {
+      allow get, write: if isOwner(userId);
+      
+      // 1. Clients
+      match /clients/{clientId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidClient(request.resource.data);
+        allow update: if isOwner(userId) && isValidClient(request.resource.data) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'status', 'summary', 'email', 'phone', 'goals', 'safetyPlan', 'updatedAt',
+            'dob', 'pronouns', 'emergencyContact', 'hipaaConsent', 'hipaaConsentDate', 
+            'liabilityWaiver', 'liabilityWaiverDate', 'intakeNotes', 'sdoh'
+          ])
+        );
+        allow delete: if isOwner(userId);
+
+        // Appointments Subcollection
+        match /appointments/{appointmentId} {
+          allow list: if isOwner(userId);
+          allow get: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidAppointment(request.resource.data);
+          allow update: if isOwner(userId) && isValidAppointment(request.resource.data) && (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'date', 'type', 'notes', 'status', 'updatedAt'
+            ])
+          );
+          allow delete: if isOwner(userId);
+        }
+
+        // Assessments Subcollection
+        match /assessments/{assessmentId} {
+          allow list: if isOwner(userId);
+          allow get: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidAssessment(request.resource.data);
+          allow delete: if isOwner(userId);
+        }
+
+        // Referrals Subcollection
+        match /referrals/{referralId} {
+          allow list: if isOwner(userId);
+          allow get: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidReferral(request.resource.data);
+          allow update: if isOwner(userId) && isValidReferral(request.resource.data) && (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'status', 'notes', 'updatedAt'
+            ])
+          );
+          allow delete: if isOwner(userId);
+        }
+
+        // Documents Subcollection
+        match /documents/{docId} {
+          allow list: if isOwner(userId);
+          allow get: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidClientDocument(request.resource.data);
+          allow delete: if isOwner(userId);
+        }
+      }
+
+      // 2. Tasks
+      match /tasks/{taskId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTask(request.resource.data);
+        allow update: if isOwner(userId) && isValidTask(request.resource.data) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'title', 'time', 'status', 'completed', 'hubId', 'updatedAt'
+          ])
+        );
+        allow delete: if isOwner(userId);
+      }
+
+      // 3. Grants
+      match /grants/{grantId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidGrant(request.resource.data);
+        allow update: if isOwner(userId) && isValidGrant(request.resource.data) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'amount', 'deadline', 'status', 'progress', 'deliverables', 'purpose', 'associatedProject', 'reportingRequirements', 'updatedAt'
+          ])
+        );
+        allow delete: if isOwner(userId);
+      }
+
+      // 3.5 Donations & Expenses
+      match /donations/{donationId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidDonation(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /expenses/{expenseId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidExpense(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // 4. Triage
+      match /triage/{triageId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTriage(request.resource.data);
+        allow update: if isOwner(userId) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'content', 'triageResult', 'processed'
+          ])
+        );
+        allow delete: if isOwner(userId);
+      }
+
+      // 5. Programs
+      match /programs/{progId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidGeneric(request.resource.data);
+        allow update: if isOwner(userId) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'desc', 'status'])
+        );
+        allow delete: if isOwner(userId);
+      }
+
+      // 5.5 Policies
+      match /policies/{policyId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidGeneric(request.resource.data);
+        allow update: if isOwner(userId) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'desc', 'status'])
+        );
+        allow delete: if isOwner(userId);
+      }
+
+      // 6. Partnerships
+      match /partnerships/{partnerId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidGeneric(request.resource.data);
+        allow update: if isOwner(userId) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name', 'organizationName', 'programName', 'website', 'contactName', 
+            'phone', 'email', 'address', 'eligibility', 'type', 'category', 'sync', 'notes'
+          ])
+        );
+        allow delete: if isOwner(userId);
+      }
+
+      // 7. Strategies
+      match /strategies/{stratId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidGeneric(request.resource.data);
+        allow update: if isOwner(userId) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'desc', 'category'])
+        );
+        allow delete: if isOwner(userId);
+      }
+
+      // 8. Meetings
+      match /meetings/{meetingId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidGeneric(request.resource.data);
+        allow update: if isOwner(userId) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'date', 'description', 'attendees'])
+        );
+        allow delete: if isOwner(userId);
+      }
+
+      // 9. Archives
+      match /archive/{archiveId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidGeneric(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // 10. Notifications
+      match /notifications/{notifId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidNotification(request.resource.data);
+        allow update: if isOwner(userId) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+        );
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // --- Validation Helpers ---
+    function isValidGeneric(data) {
+      return data.ownerId == request.auth.uid;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['title', 'message', 'type', 'ownerId']) &&
+             data.type in ['alert', 'update', 'reminder', 'Security', 'System'] &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidClientDocument(data) {
+      return data.keys().hasAll(['name', 'type', 'ownerId']) &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidClient(data) {
+      return data.keys().hasAll(['name', 'status', 'ownerId']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.status in ['active', 'high-priority', 'crisis', 'closed', 'waitlist', 'discharged'] &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['title', 'status', 'ownerId']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 300 &&
+             data.status in ['Low', 'Med', 'High'] &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidGrant(data) {
+      return data.keys().hasAll(['name', 'status', 'ownerId']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 300 &&
+             (!('purpose' in data) || data.purpose is string) &&
+             (!('associatedProject' in data) || data.associatedProject is string) &&
+             (!('reportingRequirements' in data) || data.reportingRequirements is string) &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidDonation(data) {
+      return data.keys().hasAll(['donorName', 'amount', 'date', 'ownerId']) &&
+             data.donorName is string && data.donorName.size() > 0 &&
+             data.amount is number &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidExpense(data) {
+      return data.keys().hasAll(['description', 'amount', 'date', 'ownerId']) &&
+             data.description is string && data.description.size() > 0 &&
+             data.amount is number &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidAppointment(data) {
+      return data.keys().hasAll(['clientId', 'date', 'type', 'status', 'ownerId']) &&
+             data.type in ['Intake', 'Follow-up', 'Crisis', 'Sync', 'Consultation'] &&
+             data.status in ['Scheduled', 'Completed', 'Cancelled', 'No-show'] &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidAssessment(data) {
+      return data.keys().hasAll(['report', 'status', 'ownerId']) &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidReferral(data) {
+      return data.keys().hasAll(['clientId', 'partnerId', 'partnerName', 'category', 'status', 'ownerId']) &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidTriage(data) {
+      return data.keys().hasAll(['content', 'ownerId']) &&
+             data.content is string && data.content.size() > 0 && data.content.size() <= 10000 &&
+             data.ownerId == request.auth.uid;
+    }
+  }
+}
