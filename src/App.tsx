@@ -3,7 +3,6 @@ import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
   onAuthStateChanged, 
-  User as FirebaseUser,
   signOut
 } from 'firebase/auth';
 import { 
@@ -13,10 +12,6 @@ import {
   query, 
   where, 
   orderBy,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  setDoc,
   getDoc,
   getDocFromServer,
   getDocs,
@@ -24,9 +19,30 @@ import {
   serverTimestamp,
   limit
 } from 'firebase/firestore';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { useCollectionData, useDocumentData, useCollection } from 'react-firebase-hooks/firestore';
+import { 
+  useUnifiedUser,
+  useAppCollection as useCollection,
+  useAppDocumentData as useDocumentData,
+  useAppCollectionData as useCollectionData,
+  appAddDoc as addDoc,
+  appUpdateDoc as updateDoc,
+  appSetDoc as setDoc,
+  appDeleteDoc as deleteDoc
+} from './lib/unifiedStore';
+import { 
+  HavenUser, 
+  getLocalAccounts, 
+  createLocalAccount, 
+  loginLocalAccount, 
+  loginGuest, 
+  clearUserSession, 
+  markUserSetupComplete 
+} from './lib/localAuth';
+import { seedLocalUserData } from './lib/localDataStore';
+import { AccessGateway } from './components/AccessGateway';
 import { auth, db, signInWithGoogle, devSignIn, localSignIn, updateProfile, OperationType, handleFirestoreError } from './lib/firebase';
+
+type FirebaseUser = HavenUser | any;
 import { 
   BarChart3, 
   Users, 
@@ -212,7 +228,8 @@ import { ClockModal } from './components/ClockModal';
 import { ClientSessionSearch, HighlightText } from './components/ClientSessionSearch';
 
 export default function App() {
-  const [user, loading, error] = useAuthState(auth);
+  const { user, loading, error, signOut: handleSignOut } = useUnifiedUser();
+  const [isSetupWizardForcedOpen, setIsSetupWizardForcedOpen] = useState(false);
   const userDoc = useMemo(() => user ? doc(db, `users/${user.uid}`) : null, [user?.uid]);
   const [profile, profileLoading] = useDocumentData(userDoc);
 
@@ -391,110 +408,28 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="h-screen w-screen bg-[#0f172a] flex flex-col items-center justify-center p-6 relative overflow-hidden">
-        {/* Login Background Wallpaper */}
-        <div className="absolute inset-0 z-0">
-           <div className="absolute inset-0 bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] opacity-80" />
-           <img 
-             src="/src/assets/images/haven_clean_wallpaper_1787839711322.jpg" 
-             alt="" 
-             className="absolute inset-0 w-full h-full object-cover opacity-50 transition-opacity duration-1000"
-             referrerPolicy="no-referrer"
-           />
-           <div className="absolute inset-0 backdrop-blur-[3px] bg-[#0f172a]/20" />
-        </div>
-
-        <button 
-          onClick={handleDevSignIn} 
-          className="absolute top-4 left-4 w-12 h-12 opacity-0 cursor-default z-10"
-          title="Hidden Dev Login"
-        />
-        <div className="max-w-md w-full bg-white/5 backdrop-blur-2xl border border-white/10 p-12 rounded-[2.5rem] shadow-2xl text-center relative z-10">
-          <div className="w-20 h-20 bg-teal-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-teal-500/20">
-            <div className="w-4 h-4 bg-teal-400 rounded-full animate-pulse shadow-[0_0_15px_rgba(20,184,166,0.8)]" />
-          </div>
-          <h1 className="text-4xl font-light text-white mb-4 tracking-tight">Haven Care OS</h1>
-          <p className="text-slate-400 mb-8 font-medium leading-relaxed opacity-60">
-            A secure, trauma-informed administrative operating system for sanctuary and stabilization.
-          </p>
-          {authError && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm text-left">
-              {authError}
-            </div>
-          )}
-
-          {!showLocalLogin ? (
-            <div className="space-y-4">
-              <button 
-                onClick={handleSignIn}
-                className="w-full bg-teal-600 hover:bg-teal-500 text-white py-4 rounded-2xl font-bold transition-all shadow-lg shadow-teal-900/40 flex items-center justify-center gap-3 cursor-pointer"
-              >
-                Sign in with Google
-              </button>
-              
-              <button 
-                onClick={() => setShowLocalLogin(true)}
-                className="w-full bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-white/10 py-4 rounded-2xl font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <User className="w-4 h-4 text-teal-400" />
-                Local Account Sign In
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleLocalSignIn} className="space-y-4 text-left">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Local Email / ID</label>
-                <input 
-                  type="email" 
-                  value={localEmail}
-                  onChange={(e) => setLocalEmail(e.target.value)}
-                  placeholder="admin@havenos.cloud"
-                  required
-                  className="w-full bg-slate-900/60 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-teal-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Password</label>
-                <input 
-                  type="password" 
-                  value={localPassword}
-                  onChange={(e) => setLocalPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="w-full bg-slate-900/60 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-teal-500"
-                />
-              </div>
-
-              <div className="pt-2 flex gap-3">
-                <button 
-                  type="button"
-                  onClick={() => setShowLocalLogin(false)}
-                  className="flex-1 bg-white/5 hover:bg-white/10 text-slate-300 py-3.5 rounded-xl font-medium text-sm transition-all border border-white/10 cursor-pointer"
-                >
-                  Back
-                </button>
-                <button 
-                  type="submit"
-                  disabled={localLoading}
-                  className="flex-2 bg-teal-600 hover:bg-teal-500 text-white py-3.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-teal-900/40 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {localLoading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Sign In Locally'}
-                </button>
-              </div>
-            </form>
-          )}
-
-          <p className="mt-8 text-[10px] uppercase font-black tracking-widest text-slate-500 opacity-40">
-            Secure HIPAA-aligned Instance
-          </p>
-        </div>
-      </div>
+      <AccessGateway 
+        onGoogleSignIn={handleSignIn}
+        authError={authError}
+        setAuthError={setAuthError}
+        onLaunchSetupWizard={() => {
+          loginLocalAccount('admin@havenos.local', 'admin');
+          setIsSetupWizardForcedOpen(true);
+        }}
+      />
     );
   }
 
-  // Show Setup Wizard if not completed
-  if (!profile?.completedSetup) {
-    return <SetupWizard ai={ai} user={user} setGlobalScale={setUiScale} />;
+  // Show Setup Wizard if not completed or explicitly launched
+  if (!profile?.completedSetup || isSetupWizardForcedOpen) {
+    return (
+      <SetupWizard 
+        ai={ai} 
+        user={user} 
+        setGlobalScale={setUiScale} 
+        onComplete={() => setIsSetupWizardForcedOpen(false)} 
+      />
+    );
   }
 
   const toggleLauncher = () => setIsLauncherOpen(!isLauncherOpen);
@@ -601,6 +536,16 @@ export default function App() {
             <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
             <span>MODEL: GEMINI-3.1-PRO</span>
           </div>
+
+          <Tooltip text="First-Run Setup Wizard">
+            <button
+              onClick={() => setIsSetupWizardForcedOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold transition-all shadow-sm hover:scale-105 active:scale-95 group cursor-pointer"
+            >
+              <Sparkles className="w-3 h-3 text-emerald-400 group-hover:rotate-12 transition-transform" />
+              <span>Setup Wizard</span>
+            </button>
+          </Tooltip>
           
           <span className="text-[10px] font-black tracking-[0.4em] uppercase text-teal-400 mx-2">Haven Care OS</span>
 
@@ -706,9 +651,17 @@ export default function App() {
           <div 
             onClick={() => setActiveHub('settings')}
             className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-teal-400 overflow-hidden border border-white/10 text-[10px] font-bold cursor-pointer hover:bg-teal-500/20 group transition-all"
+            title={user.displayName || user.email || 'Settings'}
           >
-            {user.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" /> : user.email?.charAt(0).toUpperCase()}
+            {user.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" /> : (user.displayName || user.email || 'U').charAt(0).toUpperCase()}
           </div>
+          <button
+            onClick={handleSignOut}
+            className="w-6 h-6 rounded-full hover:bg-red-500/20 text-slate-400 hover:text-red-400 flex items-center justify-center transition-all cursor-pointer"
+            title="Sign Out / Switch Account"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
         </div>
       </header>
 
@@ -985,6 +938,18 @@ export default function App() {
                 </div>
                 <div className="grid grid-cols-4 gap-4">
                   <button 
+                    onClick={() => {
+                      setIsSetupWizardForcedOpen(true);
+                      setIsLauncherOpen(false);
+                    }}
+                    className="bg-emerald-500/10 border border-emerald-500/20 px-6 py-5 rounded-2xl text-left hover:bg-emerald-500/20 transition-all group relative overflow-hidden cursor-pointer"
+                  >
+                    <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-400/10 blur-2xl -mr-8 -mt-8" />
+                    <Sparkles className="w-5 h-5 text-emerald-400 mb-3 group-hover:scale-110 transition-transform" />
+                    <p className="text-xs font-bold text-emerald-400 mb-1">First-Run Setup Wizard</p>
+                    <p className="text-[9px] font-black text-emerald-500/60 uppercase tracking-widest">Reconfigure Sanctuary OS</p>
+                  </button>
+                  <button 
                     onClick={() => setActiveHub('help')}
                     className="bg-teal-500/10 border border-teal-500/20 px-6 py-5 rounded-2xl text-left hover:bg-teal-500/20 transition-all group relative overflow-hidden"
                   >
@@ -1050,6 +1015,8 @@ export default function App() {
                   setIsQuickIntakeRequested={setIsQuickIntakeRequested}
                   initialPartnershipDiscovery={initialPartnershipDiscovery}
                   setInitialPartnershipDiscovery={setInitialPartnershipDiscovery}
+                  onLaunchSetupWizard={() => { setIsSetupWizardForcedOpen(true); setActiveHub(null); }}
+                  onSignOut={handleSignOut}
                 />
               </div>
             </div>
@@ -1134,7 +1101,7 @@ export default function App() {
 }
 
 // Sub-components for Hub Content
-function HubContent({ hubId, ai, user, profile, setActiveHub, isQuickIntakeRequested, setIsQuickIntakeRequested, initialPartnershipDiscovery, setInitialPartnershipDiscovery }: { hubId: HubId, ai: any, user: FirebaseUser, profile: any, setActiveHub: (id: HubId | null) => void, isQuickIntakeRequested: boolean, setIsQuickIntakeRequested: (v: boolean) => void, initialPartnershipDiscovery?: boolean, setInitialPartnershipDiscovery?: (v: boolean) => void }) {
+function HubContent({ hubId, ai, user, profile, setActiveHub, isQuickIntakeRequested, setIsQuickIntakeRequested, initialPartnershipDiscovery, setInitialPartnershipDiscovery, onLaunchSetupWizard, onSignOut }: { hubId: HubId, ai: any, user: FirebaseUser, profile: any, setActiveHub: (id: HubId | null) => void, isQuickIntakeRequested: boolean, setIsQuickIntakeRequested: (v: boolean) => void, initialPartnershipDiscovery?: boolean, setInitialPartnershipDiscovery?: (v: boolean) => void, onLaunchSetupWizard?: () => void, onSignOut?: () => void }) {
   switch (hubId) {
     case 'command': return <CommandCenter user={user} />;
     case 'clients': return (
@@ -1162,7 +1129,7 @@ function HubContent({ hubId, ai, user, profile, setActiveHub, isQuickIntakeReque
     case 'strategy': return <StrategyHub user={user} />;
     case 'archive': return <ArchiveHub user={user} />;
     case 'notifications': return <NotificationsHub user={user} />;
-    case 'settings': return <SettingsHub user={user} profile={profile} setActiveHub={setActiveHub} />;
+    case 'settings': return <SettingsHub user={user} profile={profile} setActiveHub={setActiveHub} onLaunchSetupWizard={onLaunchSetupWizard} onSignOut={onSignOut} />;
     case 'help': return <HelpHub ai={ai} />;
     default:
       return (
@@ -1229,7 +1196,6 @@ function CommandCenter({ user }: { user: FirebaseUser }) {
 
   const deleteTask = async (taskId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("Remove this priority?")) return;
     try {
       await deleteDoc(doc(db, `users/${user.uid}/tasks/${taskId}`));
     } catch (e) {
@@ -1550,7 +1516,6 @@ function ClientDetailView({ ai, client, user, onBack, isIntakeInitiallyOpen, onC
   const [activeTab, setActiveTab] = useState<'profile' | 'intake' | 'appointments' | 'referrals' | 'documents' | 'session'> (isIntakeInitiallyOpen ? 'intake' : 'profile');
 
   const flagCrisis = async () => {
-    if (!confirm(`Are you sure you want to flag a medical or safety crisis for ${client.name}? This will escalate the operational status across all hubs.`)) return;
     try {
       await updateDoc(doc(db, `users/${user.uid}/clients`, client.id), {
         status: 'crisis',
@@ -1809,7 +1774,6 @@ function ClientDocumentVault({ client, user, isIntake = false, onNotesExtracted 
   };
 
   const deleteDocItem = async (id: string) => {
-    if (!confirm("Permanently purge this document from the vault?")) return;
     try {
       await deleteDoc(doc(db, `users/${user.uid}/clients/${client.id}/documents/${id}`));
     } catch (err) {
@@ -2312,7 +2276,6 @@ function ClientAppointmentManager({ client, user }: { client: any, user: Firebas
   };
 
   const deleteAppointment = async (id: string) => {
-    if(!confirm("Wipe this appointment from history?")) return;
     await deleteDoc(doc(db, `users/${user.uid}/clients/${client.id}/appointments/${id}`));
   };
 
@@ -3016,7 +2979,6 @@ function FundingHub({ user }: { user: FirebaseUser }) {
 
   const deleteGrant = async (id: string) => {
     console.log("Deleting grant. UID:", user?.uid, "Grant ID:", id);
-    if (!confirm("Remove this grant from records?")) return;
     if (!user?.uid) {
         console.error("No user ID available for deletion");
         return;
@@ -3638,19 +3600,18 @@ function PartnershipsHub({ ai, user, profile, initialDiscoveryMode, onDiscoveryH
       setIsModalOpen(false);
     } catch (err) {
       console.error(err);
-      alert("Failed to save resource. Please try again.");
+      showToast("Failed to save resource.");
     }
   };
 
   const handleDeletePartner = async (partnerId: string, partnerName: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if (!confirm(`Are you sure you want to remove "${partnerName}" from your resource directory?`)) return;
     try {
       await deleteDoc(doc(db, `users/${user.uid}/partnerships/${partnerId}`));
       showToast(`Removed "${partnerName}".`);
     } catch (err) {
       console.error(err);
-      alert("Failed to delete resource.");
+      showToast("Failed to delete resource.");
     }
   };
 
@@ -4688,19 +4649,19 @@ function ExecutiveSupport({ ai, user }: { ai: any, user: FirebaseUser }) {
   );
 }
 
-function SetupWizard({ ai, user, setGlobalScale }: { ai: any, user: FirebaseUser, setGlobalScale: (s: number) => void }) {
+function SetupWizard({ ai, user, setGlobalScale, onComplete }: { ai: any, user: FirebaseUser, setGlobalScale: (s: number) => void, onComplete?: () => void }) {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     language: 'English (US)',
-    region: '',
-    displayName: user.displayName || '',
-    email: user.email || '',
-    phone: '',
-    orgName: '',
-    orgWebsite: '',
-    orgAddress: '',
-    orgPhone: '',
-    hubs: ['Case Management'] as string[],
+    region: 'San Francisco Bay Area',
+    displayName: user?.displayName || 'Lead Clinician',
+    email: user?.email || 'clinician@havenos.local',
+    phone: '(555) 234-5678',
+    orgName: user?.organization || 'Haven Care Sanctuary',
+    orgWebsite: 'haven-os.org',
+    orgAddress: '123 Sanctuary Way',
+    orgPhone: '(555) 234-5678',
+    hubs: ['Case Management', 'Resource Hub', 'Funding & Grants'] as string[],
     uiScale: 1
   });
   const [finishStatus, setFinishStatus] = useState<string | null>(null);
@@ -4750,24 +4711,27 @@ function SetupWizard({ ai, user, setGlobalScale }: { ai: any, user: FirebaseUser
     try {
       await setDoc(doc(db, `users/${user.uid}`), {
         userId: user.uid,
-        displayName: 'Developer',
-        email: user.email || 'dev@havenos.cloud',
-        phone: '(555) 000-0000',
-        language: 'English (US)',
-        organizationName: 'Haven OS Test',
-        organizationWebsite: 'haven-os.org',
-        organizationAddress: '123 Dev Way',
-        organizationPhone: '(555) 000-0000',
-        region: 'Localhost',
+        displayName: formData.displayName || user.displayName || 'Lead Clinician',
+        email: formData.email || user.email || 'clinician@havenos.local',
+        phone: formData.phone || '(555) 000-0000',
+        language: formData.language || 'English (US)',
+        organizationName: formData.orgName || 'Haven Care Sanctuary',
+        organizationWebsite: formData.orgWebsite || 'haven-os.org',
+        organizationAddress: formData.orgAddress || '123 Sanctuary Way',
+        organizationPhone: formData.orgPhone || '(555) 000-0000',
+        region: formData.region || 'San Francisco Bay Area',
         completedSetup: true,
-        hubsPriority: ['Case Management'],
+        hubsPriority: formData.hubs?.length ? formData.hubs : ['Case Management', 'Resource Hub', 'Funding & Grants'],
         offlineEnabled: true,
-        uiScale: 1,
+        uiScale: formData.uiScale || 1,
         createdAt: serverTimestamp()
       });
-      setGlobalScale(1);
+      setGlobalScale(formData.uiScale || 1);
+      onComplete?.();
     } catch (e) {
-      console.error(e);
+      console.error("Skip setup note:", e);
+      onComplete?.();
+    } finally {
       setIsFinishing(false);
     }
   };
@@ -4816,7 +4780,9 @@ function SetupWizard({ ai, user, setGlobalScale }: { ai: any, user: FirebaseUser
              });
           }
         } catch (e) {
-          console.error("Resource generation failed during setup:", e);
+          console.warn("Resource generation fallback during setup:", e);
+          // Seed local data store partnerships so directory is never empty!
+          seedLocalUserData(user.uid, formData.displayName, formData.orgName);
         }
       }
 
@@ -4839,8 +4805,11 @@ function SetupWizard({ ai, user, setGlobalScale }: { ai: any, user: FirebaseUser
         createdAt: serverTimestamp()
       });
       setGlobalScale(formData.uiScale);
+      onComplete?.();
     } catch (e) {
       console.error(e);
+      onComplete?.();
+    } finally {
       setIsFinishing(false);
       setFinishStatus(null);
     }
@@ -4910,6 +4879,19 @@ function SetupWizard({ ai, user, setGlobalScale }: { ai: any, user: FirebaseUser
 
         {/* Right Side: Form Content */}
         <div className="w-[55%] p-20 flex flex-col bg-black/40 relative">
+          <div className="flex items-center justify-between pb-6 mb-4 border-b border-white/5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">
+              Step {step} of {totalSteps}
+            </span>
+            <button
+              type="button"
+              onClick={devSkipSetup}
+              className="text-[10px] font-bold text-slate-400 hover:text-teal-300 uppercase tracking-widest px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-all border border-white/5 flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>Skip to Desktop</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
           <div className="flex-1 flex flex-col justify-center overflow-y-auto custom-scrollbar pr-4">
             <AnimatePresence mode="wait">
               {step === 1 && (
@@ -5227,9 +5209,10 @@ function SetupWizard({ ai, user, setGlobalScale }: { ai: any, user: FirebaseUser
   );
 }
 
-function SettingsHub({ user, profile, setActiveHub }: { user: FirebaseUser, profile: any, setActiveHub: (id: HubId | null) => void }) {
+function SettingsHub({ user, profile, setActiveHub, onLaunchSetupWizard, onSignOut }: { user: FirebaseUser, profile: any, setActiveHub: (id: HubId | null) => void, onLaunchSetupWizard?: () => void, onSignOut?: () => void }) {
   const [activeSection, setActiveSection] = useState('profile');
   const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [localProfile, setLocalProfile] = useState({
     displayName: profile?.displayName || user?.displayName || '',
     photoURL: profile?.photoURL || user?.photoURL || '',
@@ -5246,64 +5229,54 @@ function SettingsHub({ user, profile, setActiveHub }: { user: FirebaseUser, prof
 
   const handleSave = async () => {
     setIsSaving(true);
+    setSaveSuccessMsg(null);
     try {
-      // Update Firebase Auth Profile
-      if (localProfile.displayName !== user.displayName || localProfile.photoURL !== user.photoURL) {
-        await updateProfile(user, {
-          displayName: localProfile.displayName,
-          photoURL: localProfile.photoURL
-        });
+      // Update Firebase Auth Profile if authenticated
+      if (user && !user.isLocal && (localProfile.displayName !== user.displayName || localProfile.photoURL !== user.photoURL)) {
+        try {
+          await updateProfile(user, {
+            displayName: localProfile.displayName,
+            photoURL: localProfile.photoURL
+          });
+        } catch {}
       }
 
-      // Update Firestore Profile
+      // Update Firestore / Local Profile
       await setDoc(doc(db, `users/${user.uid}`), {
         ...localProfile,
         updatedAt: serverTimestamp()
       }, { merge: true });
-      alert("System parameters synchronized successfully.");
+      setSaveSuccessMsg("System parameters saved successfully.");
+      setTimeout(() => setSaveSuccessMsg(null), 3000);
     } catch (e) {
       console.error(e);
-      alert("Synchronization failed. Check console for details.");
+      setSaveSuccessMsg("Failed to save settings.");
     }
     setIsSaving(false);
   };
 
   const handleReset = async () => {
-    if (confirm("Are you sure you want to reset your OS? This will return you to the setup wizard. No operational data (clients, tasks) will be deleted, but your system preferences will be lost.")) {
-      try {
-        await setDoc(doc(db, `users/${user.uid}`), { completedSetup: false }, { merge: true });
-      } catch (e) {
-        console.error(e);
+    try {
+      await setDoc(doc(db, `users/${user.uid}`), { completedSetup: false }, { merge: true });
+      if (onLaunchSetupWizard) {
+        onLaunchSetupWizard();
       }
+    } catch (e) {
+      console.error(e);
     }
   };
 
   const handlePowerWash = async () => {
-    if (confirm("WARNING: POWER WASH\nAre you absolutely sure? This will permanently delete ALL your data (clients, programs, resources, tasks, etc) and restore Haven OS to factory settings. This cannot be undone.")) {
-      if (prompt("Type 'POWER WASH' to confirm:") !== "POWER WASH") {
-        alert("Power wash aborted.");
-        return;
-      }
-      setIsSaving(true);
-      try {
-        const collectionsToClear = ['clients', 'programs', 'partnerships', 'tasks', 'grants', 'donations', 'expenses', 'meetings', 'policies'];
-        for (const colName of collectionsToClear) {
-          const colRef = collection(db, `users/${user.uid}/${colName}`);
-          const snapshot = await getDocs(colRef);
-          if (!snapshot.empty) {
-            const batch = writeBatch(db);
-            snapshot.docs.forEach(d => batch.delete(d.ref));
-            await batch.commit();
-          }
-        }
-        await deleteDoc(doc(db, `users/${user.uid}`));
-        window.location.reload();
-      } catch (e) {
-        console.error(e);
-        alert("Error during power wash.");
-      } finally {
-        setIsSaving(false);
-      }
+    setIsSaving(true);
+    try {
+      localStorage.clear();
+      await deleteDoc(doc(db, `users/${user.uid}`));
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+      window.location.reload();
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -5329,13 +5302,23 @@ function SettingsHub({ user, profile, setActiveHub }: { user: FirebaseUser, prof
     <div className="max-w-6xl mx-auto h-[calc(100vh-200px)] flex bg-white/5 backdrop-blur-2xl rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl">
       {/* Sidebar */}
       <div className="w-72 bg-black/20 border-r border-white/5 p-8 flex flex-col">
-        <h2 className="text-xl font-bold text-white mb-10 tracking-tight">System Settings</h2>
+        <h2 className="text-xl font-bold text-white mb-6 tracking-tight">System Settings</h2>
+        
+        {/* Quick Launch Setup Wizard Button */}
+        <button 
+          onClick={onLaunchSetupWizard}
+          className="w-full flex items-center gap-3 p-3.5 rounded-2xl transition-all bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 shadow-sm cursor-pointer mb-6 group"
+        >
+          <Sparkles className="w-4 h-4 text-emerald-400 group-hover:rotate-12 transition-transform" />
+          <span className="text-xs font-bold tracking-tight">Run Setup Wizard</span>
+        </button>
+
         <nav className="flex-1 space-y-2">
           {sections.map(s => (
             <button 
               key={s.id}
               onClick={() => handleNavClick(s.id)}
-              className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${activeSection === s.id ? 'bg-teal-500/20 text-teal-400 border border-teal-500/20 shadow-lg' : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent'}`}
+              className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${activeSection === s.id ? 'bg-teal-500/20 text-teal-400 border border-teal-500/20 shadow-lg' : 'text-slate-400 hover:bg-white/5 hover:text-white border border-transparent cursor-pointer'}`}
             >
               <s.icon className="w-5 h-5" />
               <span className="text-sm font-bold tracking-tight">{s.name}</span>
@@ -5343,8 +5326,8 @@ function SettingsHub({ user, profile, setActiveHub }: { user: FirebaseUser, prof
           ))}
         </nav>
         <button 
-           onClick={() => signOut(auth)}
-          className="mt-auto flex items-center gap-4 p-4 rounded-2xl text-red-400 hover:bg-red-500/10 transition-all border border-transparent"
+          onClick={() => onSignOut ? onSignOut() : clearUserSession()}
+          className="mt-auto flex items-center gap-4 p-4 rounded-2xl text-red-400 hover:bg-red-500/10 transition-all border border-transparent cursor-pointer"
         >
           <LogOut className="w-5 h-5" />
           <span className="text-sm font-bold">Sign Out</span>

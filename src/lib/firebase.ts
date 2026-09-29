@@ -33,50 +33,14 @@ export const signInWithGoogle = async () => {
   }
 };
 
+import { loginLocalAccount } from './localAuth';
+
 export const devSignIn = async () => {
-  try {
-    const email = "dev@havenos.cloud";
-    const password = "devpassword123";
-    try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      return result.user;
-    } catch (e: any) {
-      if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
-        const result = await createUserWithEmailAndPassword(auth, email, password);
-        return result.user;
-      }
-      throw e;
-    }
-  } catch (error: any) {
-    if (error?.code === 'auth/operation-not-allowed') {
-      console.warn("Email/Password authentication is not enabled in Firebase project. Please use Google Sign-in or enable Email/Password in Firebase Console.");
-    } else {
-      console.error("Dev Sign in error:", error);
-    }
-    throw error;
-  }
+  return loginLocalAccount('admin@havenos.local', 'admin');
 };
 
-export const localSignIn = async (email: string, password: string) => {
-  try {
-    try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      return result.user;
-    } catch (e: any) {
-      if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
-        const result = await createUserWithEmailAndPassword(auth, email, password);
-        return result.user;
-      }
-      throw e;
-    }
-  } catch (error: any) {
-    if (error?.code === 'auth/operation-not-allowed') {
-      console.warn("Email/Password authentication is not enabled in Firebase project. Please use Google Sign-in or enable Email/Password in Firebase Console.");
-    } else {
-      console.error("Local Sign in error:", error);
-    }
-    throw error;
-  }
+export const localSignIn = async (email: string, password?: string) => {
+  return loginLocalAccount(email, password || 'haven123');
 };
 
 // Validation for connection
